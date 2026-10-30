@@ -4,6 +4,7 @@ name: Atualizar dados
 on:
   schedule:
     - cron: "23 * * * *"
+    - cron: "53 * * * *"  # reserva: o cron do GitHub falha/atrasa; se o das :23 correu, este salta (ver o job check)
   workflow_dispatch:
     inputs:
       force_odds:
@@ -19,7 +20,29 @@ defaults:
     shell: bash
     working-directory: code
 jobs:
+  check:  # agendado: só corre a atualização se a última com sucesso tiver mais de 40 min (dois crons por hora sem duplicar pedidos às APIs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    defaults:
+      run:
+        working-directory: .
+    outputs:
+      skip: ${{ steps.age.outputs.skip }}
+    steps:
+      - id: age
+        env:
+          EVENT: ${{ github.event_name }}
+          URL: https://api.github.com/repos/${{ github.repository }}/actions/workflows/update.yml/runs?status=success&per_page=1
+        run: |
+          skip=false
+          if [ "$EVENT" = "schedule" ]; then
+            last=$(curl -s -H "Authorization: Bearer ${{ github.token }}" "$URL" | jq -r '.workflow_runs[0].created_at // empty' || true)
+            if [ -n "$last" ] && [ $(( $(date +%s) - $(date -d "$last" +%s) )) -lt 2400 ]; then skip=true; fi
+          fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
   update:
+    needs: check
+    if: needs.check.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:

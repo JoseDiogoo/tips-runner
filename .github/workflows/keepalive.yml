@@ -3,6 +3,7 @@ name: Manter app acordada
 on:
   schedule:
     - cron: "23 */2 * * *"
+    - cron: "53 */2 * * *"  # reserva do cron do GitHub
   workflow_dispatch:
 permissions: {}
 jobs:
