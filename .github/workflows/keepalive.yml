@@ -1,0 +1,22 @@
+# Mantém a app do Streamlit acordada (abre-a num browser de 2 em 2 horas).
+name: Manter app acordada
+on:
+  schedule:
+    - cron: "23 */2 * * *"
+  workflow_dispatch:
+permissions: {}
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install playwright==1.48.0 && python -m playwright install --with-deps chromium
+      - uses: actions/checkout@v4
+        with:
+          repository: JoseDiogoo/tips
+          token: ${{ secrets.TIPS_TOKEN }}
+          persist-credentials: false
+      - run: python scripts/keepalive.py https://tips-tenis.streamlit.app/ > /dev/null 2>&1 || { echo "keepalive falhou"; exit 1; }
