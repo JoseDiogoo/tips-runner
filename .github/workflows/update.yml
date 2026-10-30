@@ -54,4 +54,5 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         working-directory: .
-        run: curl -s -o /dev/null -d chat_id="$TELEGRAM_CHAT_ID" -d text="⚠️ Atualizar dados falhou: ver github.com/JoseDiogoo/tips-runner/actions" "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" || true
+        run: |
+          curl -s -o /dev/null -d chat_id="$TELEGRAM_CHAT_ID" -d text="⚠️ Atualizar dados falhou - ver github.com/JoseDiogoo/tips-runner/actions" "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" || true
