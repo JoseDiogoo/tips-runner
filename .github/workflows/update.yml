@@ -1,13 +1,21 @@
 # Repositório público só para ter minutos de Actions grátis: o código e os dados ficam no repositório privado.
 # Toda a saída vai para um ficheiro (os logs deste repositório são públicos).
 name: Atualizar dados
+# Dois modos no mesmo workflow (o grupo `dados` só guarda 1 execução pendente: dois workflows cancelavam-se uns aos outros):
+# atualização completa (:08 :23 :38 :53) e decisão IA leve (de 10 em 10 min, ~3 min), que não espera pelos ~10 min do update.
+run-name: ${{ (github.event.schedule == '5,15,25,35,45,55 * * * *' || inputs.only_decide) && 'decisão IA' || 'atualização' }}
 on:
   schedule:
+    - cron: "5,15,25,35,45,55 * * * *"
     - cron: "8,23,38,53 * * * *"  # de 15 em 15 min; o cron do GitHub falha/atrasa, por isso o job check salta os que chegam com uma atualização recente
   workflow_dispatch:
     inputs:
       only_if_stale:
         description: "Só atualizar se a última atualização tiver mais de 12 min (usado pelo agendador externo)"
+        type: boolean
+        default: false
+      only_decide:
+        description: "Só a decisão final da banca IA (rápida)"
         type: boolean
         default: false
       force_odds:
@@ -31,19 +39,26 @@ jobs:
         working-directory: .
     outputs:
       skip: ${{ steps.age.outputs.skip }}
+      decide: ${{ steps.age.outputs.decide }}
     steps:
       - id: age
         env:
           EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+          ONLY_DECIDE: ${{ inputs.only_decide }}
           STALE_ONLY: ${{ inputs.only_if_stale }}
-          URL: https://api.github.com/repos/${{ github.repository }}/actions/workflows/update.yml/runs?status=success&per_page=1
+          URL: https://api.github.com/repos/${{ github.repository }}/actions/workflows/update.yml/runs?status=success&per_page=30
         run: |
           skip=false
-          if [ "$EVENT" = "schedule" ] || [ "$STALE_ONLY" = "true" ]; then
-            last=$(curl -s -H "Authorization: Bearer ${{ github.token }}" "$URL" | jq -r '.workflow_runs[0].created_at // empty' || true)
+          decide=false
+          if [ "$SCHEDULE" = "5,15,25,35,45,55 * * * *" ] || [ "$ONLY_DECIDE" = "true" ]; then
+            decide=true
+          elif [ "$EVENT" = "schedule" ] || [ "$STALE_ONLY" = "true" ]; then
+            last=$(curl -s -H "Authorization: Bearer ${{ github.token }}" "$URL" | jq -r '[.workflow_runs[] | select(.display_title != "decisão IA")][0].created_at // empty' || true)
             if [ -n "$last" ] && [ $(( $(date +%s) - $(date -d "$last" +%s) )) -lt 720 ]; then skip=true; fi
           fi
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
+          echo "decide=$decide" >> "$GITHUB_OUTPUT"
   update:
     needs: check
     if: needs.check.outputs.skip != 'true'
@@ -76,8 +91,11 @@ jobs:
           cache-dependency-path: code/requirements.txt
       - run: pip install -r requirements.txt > /dev/null 2>&1 || { echo "pip falhou"; exit 1; }
       - run: mkdir -p data && python cloud.py pull > /tmp/run.log 2>&1 || { echo "pull falhou (sem log publico)"; exit 1; }
-      - run: python -W ignore update.py >> /tmp/run.log 2>&1 || { echo "update falhou (sem log publico)"; exit 1; }
-      - run: python cloud.py push >> /tmp/run.log 2>&1 || { echo "push falhou (sem log publico)"; exit 1; }
+      - if: needs.check.outputs.decide != 'true'
+        run: python -W ignore update.py >> /tmp/run.log 2>&1 || { echo "update falhou (sem log publico)"; exit 1; }
+      - if: needs.check.outputs.decide == 'true'
+        run: python -W ignore decide.py >> /tmp/run.log 2>&1 || { echo "decide falhou (sem log publico)"; exit 1; }
+      - run: python cloud.py ${{ needs.check.outputs.decide == 'true' && 'push-ia' || 'push' }} >> /tmp/run.log 2>&1 || { echo "push falhou (sem log publico)"; exit 1; }
       - if: failure()
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
