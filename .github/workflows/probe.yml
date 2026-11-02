@@ -1,0 +1,65 @@
+# Teste pontual de quotas das chaves (apagar depois). Só imprime códigos HTTP e saldos, nunca valores.
+name: Probe quotas
+on: workflow_dispatch
+permissions: {}
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      AF1: ${{ secrets.API_FOOTBALL_KEY_1 }}
+      AF2: ${{ secrets.API_FOOTBALL_KEY_2 }}
+      AF3: ${{ secrets.API_FOOTBALL_KEY_3 }}
+      G1: ${{ secrets.GROQ_1 }}
+      G2: ${{ secrets.GROQ_2 }}
+      G3: ${{ secrets.GROQ_3 }}
+      G4: ${{ secrets.GROQ_4 }}
+      G5: ${{ secrets.GROQ_5 }}
+      GEM: ${{ secrets.GEMINI_API_KEY }}
+      O1: ${{ secrets.ODDS_API_KEY }}
+      O2: ${{ secrets.ODDS_API_KEY_2 }}
+      O3: ${{ secrets.ODDS_API_KEY_3 }}
+      O4: ${{ secrets.ODDS_API_KEY_4 }}
+      O5: ${{ secrets.ODDS_API_KEY_5 }}
+      T1: ${{ secrets.API_TENNIS_KEY }}
+      T2: ${{ secrets.API_TENNIS_KEY_2 }}
+    steps:
+      - run: |
+          python3 - <<'PY'
+          import os, json, urllib.request, urllib.error
+          def call(label, url, headers=None, body=None, show=()):
+              if not os.environ.get(label.split()[1] if False else "") and False: pass
+              req = urllib.request.Request(url, data=body, headers={"User-Agent": "probe", **(headers or {})})
+              try:
+                  r = urllib.request.urlopen(req, timeout=30); code, hd, txt = r.status, r.headers, r.read().decode()
+              except urllib.error.HTTPError as e:
+                  code, hd, txt = e.code, e.headers, e.read().decode(errors="ignore")
+              extra = {h: hd.get(h) for h in show if hd.get(h)}
+              return code, extra, txt
+          def key(n): return os.environ.get(n, "")
+          for n in ("AF1", "AF2", "AF3"):
+              if not key(n): print(n, "vazia"); continue
+              c, h, t = call(n, "https://v3.football.api-sports.io/status", {"x-apisports-key": key(n)}, show=("x-ratelimit-requests-remaining",))
+              try: err = json.loads(t).get("errors")
+              except ValueError: err = "?"
+              print(n, c, h, err if err else "ok")
+          body = json.dumps({"model": "openai/gpt-oss-20b", "messages": [{"role": "user", "content": "ok"}], "max_tokens": 16}).encode()
+          for n in ("G1", "G2", "G3", "G4", "G5"):
+              if not key(n): print(n, "vazia"); continue
+              c, h, t = call(n, "https://api.groq.com/openai/v1/chat/completions", {"Authorization": "Bearer " + key(n), "Content-Type": "application/json"}, body,
+                             show=("x-ratelimit-remaining-requests", "x-ratelimit-remaining-tokens", "x-ratelimit-reset-requests", "x-ratelimit-reset-tokens", "retry-after"))
+              print(n, c, h, "" if c == 200 else t[:200].replace(key(n), "***"))
+          for m in ("gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.1-flash-lite"):
+              c, h, t = call("GEM", f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent", {"x-goog-api-key": key("GEM"), "Content-Type": "application/json"},
+                             json.dumps({"contents": [{"parts": [{"text": "ok"}]}]}).encode())
+              print("GEM", m, c, "" if c == 200 else t[:200].replace(key("GEM"), "***"))
+          for n in ("O1", "O2", "O3", "O4", "O5"):
+              if not key(n): print(n, "vazia"); continue
+              c, h, t = call(n, "https://api.the-odds-api.com/v4/sports/?apiKey=" + key(n), show=("x-requests-remaining", "x-requests-used"))
+              print(n, c, h)
+          for n in ("T1", "T2"):
+              if not key(n): print(n, "vazia"); continue
+              c, h, t = call(n, "https://api.api-tennis.com/tennis/?method=get_livescore&APIkey=" + key(n))
+              try: d = json.loads(t); print(n, c, "success=", d.get("success"), "error=", d.get("error"))
+              except ValueError: print(n, c, "resposta nao JSON")
+          PY
