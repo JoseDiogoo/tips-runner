@@ -1,6 +1,9 @@
 # Teste pontual (apagar depois): formato das odds ao vivo da API-Football. Não imprime chaves.
 name: Probe odds ao vivo
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "10,40 20 2 11 *"  # só hoje (2/11), a meio da Atalanta-Parma (19:45 UTC) e do Mallorca-Cádiz (20:00 UTC); apagar depois do teste
 permissions: {}
 jobs:
   probe:
@@ -19,7 +22,8 @@ jobs:
           d, left = get("/odds/live")
           rs = d.get("response", [])
           print("erros:", d.get("errors"), "| jogos com odds ao vivo:", len(rs), "| pedidos restantes:", left)
-          for x in rs[:3]:
+          want = [x for x in rs if any(n in (x["teams"]["home"]["name"] + x["teams"]["away"]["name"]) for n in ("Atalanta", "Parma", "Mallorca", "Cadiz", "Cádiz"))]
+          for x in (want or rs)[:3]:
               print("jogo:", x["fixture"], x["teams"], x["status"])
               for m in x["odds"][:40]:
                   vals = [(v.get("value"), v.get("odd"), v.get("handicap"), v.get("main"), v.get("suspended")) for v in m["values"][:6]]
