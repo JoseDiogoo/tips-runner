@@ -1,0 +1,28 @@
+# Teste pontual (apagar depois): formato das odds ao vivo da API-Football. Não imprime chaves.
+name: Probe odds ao vivo
+on: workflow_dispatch
+permissions: {}
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      AF3: ${{ secrets.API_FOOTBALL_KEY_3 }}
+    steps:
+      - run: |
+          python3 - <<'PY'
+          import os, json, urllib.request
+          def get(path):
+              req = urllib.request.Request("https://v3.football.api-sports.io" + path, headers={"x-apisports-key": os.environ["AF3"], "User-Agent": "probe"})
+              r = urllib.request.urlopen(req, timeout=30)
+              return json.load(r), r.headers.get("x-ratelimit-requests-remaining")
+          d, left = get("/odds/live")
+          rs = d.get("response", [])
+          print("erros:", d.get("errors"), "| jogos com odds ao vivo:", len(rs), "| pedidos restantes:", left)
+          for x in rs[:3]:
+              print("jogo:", x["fixture"], x["teams"], x["status"])
+              for m in x["odds"][:40]:
+                  vals = [(v.get("value"), v.get("odd"), v.get("handicap"), v.get("main"), v.get("suspended")) for v in m["values"][:6]]
+                  print("  ", m.get("id"), m.get("name"), vals)
+          print("nomes de mercados:", sorted({m["name"] for x in rs for m in x["odds"]})[:60])
+          PY
