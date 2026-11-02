@@ -1,0 +1,46 @@
+# Teste pontual (apagar depois): quotas reais das chaves Groq e Gemini. Não imprime chaves, só índices, códigos e cabeçalhos de quota.
+name: Quotas das chaves
+on: workflow_dispatch
+permissions: {}
+jobs:
+  quota:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GROQ: ${{ secrets.GROQ_1 }},${{ secrets.GROQ_2 }},${{ secrets.GROQ_3 }},${{ secrets.GROQ_4 }},${{ secrets.GROQ_5 }}
+      GEMINI: ${{ secrets.GEMINI_API_KEY }},${{ secrets.GEMINI_API_KEY_2 }},${{ secrets.GEMINI_API_KEY_3 }},${{ secrets.GEMINI_API_KEY_4 }},${{ secrets.GEMINI_API_KEY_5 }}
+    steps:
+      - run: |
+          python3 - <<'PY'
+          import os, json, urllib.request, urllib.error, time
+          def call(url, body, headers):
+              req = urllib.request.Request(url, json.dumps(body).encode(), {"Content-Type": "application/json", "User-Agent": "quota", **headers})
+              try:
+                  r = urllib.request.urlopen(req, timeout=40)
+                  return r.status, dict(r.headers), r.read()[:300]
+              except urllib.error.HTTPError as e:
+                  return e.code, dict(e.headers), e.read()[:400]
+          want = ("x-ratelimit-limit-requests", "x-ratelimit-remaining-requests", "x-ratelimit-limit-tokens", "x-ratelimit-remaining-tokens", "x-ratelimit-reset-requests", "x-ratelimit-reset-tokens")
+          print("== GROQ (a quota é por organização e por modelo; se 'remaining-requests' desce de chave para chave, partilham a quota) ==")
+          keys = [k.strip() for k in os.environ["GROQ"].split(",") if k.strip()]
+          print("chaves Groq com valor:", len(keys))
+          for model in ("openai/gpt-oss-120b", "openai/gpt-oss-20b"):
+              for i, k in enumerate(keys + keys[:1], 1):
+                  s, h, b = call("https://api.groq.com/openai/v1/chat/completions", {"model": model, "messages": [{"role": "user", "content": "ok"}], "max_tokens": 5}, {"Authorization": "Bearer " + k})
+                  h = {x.lower(): v for x, v in h.items()}
+                  print(model, "chave", i if i <= len(keys) else "1(repetida)", "->", s, {w.replace("x-ratelimit-", ""): h.get(w) for w in want if h.get(w)})
+          print("== GEMINI (sem cabeçalhos de quota: só se responde e com que código) ==")
+          keys = [k.strip() for k in os.environ["GEMINI"].split(",") if k.strip()]
+          print("chaves Gemini com valor:", len(keys))
+          for model in ("gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.1-flash-lite"):
+              for i, k in enumerate(keys, 1):
+                  s, h, b = call(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent", {"contents": [{"parts": [{"text": "ok"}]}], "generationConfig": {"maxOutputTokens": 5}}, {"x-goog-api-key": k})
+                  msg = ""
+                  if s != 200:
+                      try:
+                          e = json.loads(b + b"")["error"]; msg = e.get("status", "") + " " + str(e.get("message", ""))[:90]
+                      except Exception:
+                          msg = b[:90].decode("utf-8", "ignore")
+                  print(model, "chave", i, "->", s, msg)
+                  time.sleep(0.3)
+          PY
