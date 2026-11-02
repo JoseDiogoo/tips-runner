@@ -20,11 +20,13 @@ jobs:
                   return r.status, dict(r.headers), r.read()[:300]
               except urllib.error.HTTPError as e:
                   return e.code, dict(e.headers), e.read()[:400]
+              except Exception as e:  # timeouts e falhas de rede
+                  return 0, {}, str(e)[:80].encode()
           want = ("x-ratelimit-limit-requests", "x-ratelimit-remaining-requests", "x-ratelimit-limit-tokens", "x-ratelimit-remaining-tokens", "x-ratelimit-reset-requests", "x-ratelimit-reset-tokens")
           print("== GROQ (a quota é por organização e por modelo; se 'remaining-requests' desce de chave para chave, partilham a quota) ==")
           keys = [k.strip() for k in os.environ["GROQ"].split(",") if k.strip()]
           print("chaves Groq com valor:", len(keys))
-          for model in ("openai/gpt-oss-120b", "openai/gpt-oss-20b"):
+          for model in ():  # Groq já medido
               for i, k in enumerate(keys + keys[:1], 1):
                   s, h, b = call("https://api.groq.com/openai/v1/chat/completions", {"model": model, "messages": [{"role": "user", "content": "ok"}], "max_tokens": 5}, {"Authorization": "Bearer " + k})
                   h = {x.lower(): v for x, v in h.items()}
@@ -32,7 +34,7 @@ jobs:
           print("== GEMINI (sem cabeçalhos de quota: só se responde e com que código) ==")
           keys = [k.strip() for k in os.environ["GEMINI"].split(",") if k.strip()]
           print("chaves Gemini com valor:", len(keys))
-          for model in ("gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.1-flash-lite"):
+          for model in ("gemini-3.1-flash-lite", "gemini-3.1-flash-lite"):
               for i, k in enumerate(keys, 1):
                   s, h, b = call(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent", {"contents": [{"parts": [{"text": "ok"}]}], "generationConfig": {"maxOutputTokens": 5}}, {"x-goog-api-key": k})
                   msg = ""
