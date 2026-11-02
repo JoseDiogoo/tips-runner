@@ -3,12 +3,11 @@
 name: Atualizar dados
 on:
   schedule:
-    - cron: "23 * * * *"
-    - cron: "53 * * * *"  # reserva: o cron do GitHub falha/atrasa; se o das :23 correu, este salta (ver o job check)
+    - cron: "8,23,38,53 * * * *"  # de 15 em 15 min; o cron do GitHub falha/atrasa, por isso o job check salta os que chegam com uma atualização recente
   workflow_dispatch:
     inputs:
       only_if_stale:
-        description: "Só atualizar se a última atualização tiver mais de 40 min (usado pelo agendador externo)"
+        description: "Só atualizar se a última atualização tiver mais de 12 min (usado pelo agendador externo)"
         type: boolean
         default: false
       force_odds:
@@ -24,7 +23,7 @@ defaults:
     shell: bash
     working-directory: code
 jobs:
-  check:  # agendado: só corre a atualização se a última com sucesso tiver mais de 40 min (dois crons por hora sem duplicar pedidos às APIs)
+  check:  # agendado: só corre a atualização se a última com sucesso tiver mais de 12 min (dois crons por hora sem duplicar pedidos às APIs)
     runs-on: ubuntu-latest
     timeout-minutes: 2
     defaults:
@@ -42,7 +41,7 @@ jobs:
           skip=false
           if [ "$EVENT" = "schedule" ] || [ "$STALE_ONLY" = "true" ]; then
             last=$(curl -s -H "Authorization: Bearer ${{ github.token }}" "$URL" | jq -r '.workflow_runs[0].created_at // empty' || true)
-            if [ -n "$last" ] && [ $(( $(date +%s) - $(date -d "$last" +%s) )) -lt 2400 ]; then skip=true; fi
+            if [ -n "$last" ] && [ $(( $(date +%s) - $(date -d "$last" +%s) )) -lt 720 ]; then skip=true; fi
           fi
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
   update:
