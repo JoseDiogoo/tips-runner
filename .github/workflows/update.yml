@@ -55,7 +55,7 @@ jobs:
       TIPS_REPO: JoseDiogoo/tips
       FORCE_ODDS: ${{ inputs.force_odds }}
       ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }},${{ secrets.ODDS_API_KEY_2 }},${{ secrets.ODDS_API_KEY_3 }},${{ secrets.ODDS_API_KEY_4 }},${{ secrets.ODDS_API_KEY_5 }}
-      API_TENNIS_KEY: ${{ secrets.API_TENNIS_KEY }},${{ secrets.API_TENNIS_KEY_2 }}
+      API_TENNIS_KEY: ${{ secrets.API_TENNIS_KEY }},${{ secrets.API_TENNIS_KEY_2 }},${{ secrets.API_TENNIS_KEY_3 }}
       API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY_1 }},${{ secrets.API_FOOTBALL_KEY_2 }},${{ secrets.API_FOOTBALL_KEY_3 }}
       ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY_2 }},${{ secrets.ODDSPAPI_KEY_3 }},${{ secrets.ODDSPAPI_KEY_4 }},${{ secrets.ODDSPAPI_KEY }}
       HIGHLIGHTLY_KEY: ${{ secrets.HIGHLIGHTLY_KEY_1 }},${{ secrets.HIGHLIGHTLY_KEY_2 }}
