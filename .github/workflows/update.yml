@@ -18,6 +18,10 @@ on:
         description: "Só a decisão final da banca IA (rápida)"
         type: boolean
         default: false
+      redo_ia:
+        description: "Refazer a triagem do comité IA dos jogos das próximas 3 h (depois de mudar prompts)"
+        type: boolean
+        default: false
       force_odds:
         description: "Ignorar os intervalos e pedir já as odds de futebol/NBA (gasta créditos)"
         type: boolean
@@ -68,6 +72,7 @@ jobs:
       GH_TOKEN: ${{ secrets.TIPS_TOKEN }}
       TIPS_REPO: JoseDiogoo/tips
       FORCE_ODDS: ${{ inputs.force_odds }}
+      IA_REDO: ${{ inputs.redo_ia }}
       ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }},${{ secrets.ODDS_API_KEY_2 }},${{ secrets.ODDS_API_KEY_3 }},${{ secrets.ODDS_API_KEY_4 }},${{ secrets.ODDS_API_KEY_5 }}
       API_TENNIS_KEY: ${{ secrets.API_TENNIS_KEY }},${{ secrets.API_TENNIS_KEY_2 }},${{ secrets.API_TENNIS_KEY_3 }}
       API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY_1 }},${{ secrets.API_FOOTBALL_KEY_2 }},${{ secrets.API_FOOTBALL_KEY_3 }}
