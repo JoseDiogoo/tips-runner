@@ -1,0 +1,43 @@
+name: teste de fontes
+# Só leitura: tenta abrir fontes públicas a partir dos IPs do Actions e escreve no log o que respondeu. Não usa segredos nem toca nos dados.
+on: workflow_dispatch
+jobs:
+  fontes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - run: |
+          pip -q install soccerdata 2>&1 | tail -1
+          python - <<'PY'
+          import urllib.request, json, re, csv, io, datetime as dt
+          UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36", "Accept-Language": "en"}
+          def get(u):
+              try:
+                  r = urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=25)
+                  return r.status, r.read().decode("utf8", "ignore")
+              except Exception as e:
+                  return str(e)[:70], ""
+          day = dt.date.today()
+          def show(nome, c, ok, extra=""):
+              print(f"{'OK ' if ok else 'FALHA'} | {nome} | {c} | {extra}")
+          c, b = get("https://understat.com/league/EPL/2026"); show("Understat liga", c, "teamsData" in b or "datesData" in b, f"{len(b)} bytes")
+          c, b = get(f"http://api.clubelo.com/{day}"); rows = list(csv.DictReader(io.StringIO(b))) if b.startswith("Rank") else []; show("ClubElo", c, len(rows) > 100, f"{len(rows)} clubes")
+          c, b = get(f"https://api.sofascore.com/api/v1/sport/football/scheduled-events/{day}"); n = len(json.loads(b)["events"]) if b.startswith("{") else 0; show("Sofascore jogos do dia", c, n > 0, f"{n} jogos")
+          c, b = get(f"https://www.fotmob.com/api/matches?date={day:%Y%m%d}"); show("FotMob jogos do dia", c, b.startswith("{"), f"{len(b)} bytes")
+          c, b = get("https://fantasy.premierleague.com/api/bootstrap-static/"); show("FPL", c, b.startswith("{"), f"{len(b)} bytes")
+          c, b = get("https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries"); show("ESPN NBA lesões", c, b.startswith("{"), f"{len(b)} bytes")
+          c, b = get("https://official.nba.com/nba-injury-report-2025-26-season/"); show("NBA relatório oficial (página)", c, "Injury-Report" in b, f"{len(b)} bytes")
+          c, b = get("https://www.football-data.co.uk/mmz4281/2627/E0.csv"); show("football-data.co.uk", c, b.startswith("Div"), f"{len(b)} bytes")
+          c, b = get("https://www.transfermarkt.com/robots.txt"); show("Transfermarkt robots.txt (só para ver se responde)", c, "User-agent" in b, f"{len(b)} bytes")
+          try:
+              import soccerdata as sd
+              s = sd.Sofascore(leagues="ENG-Premier League", seasons="2026-27")
+              print("OK  | soccerdata.Sofascore | ", len(s.read_schedule()), "jogos")
+          except Exception as e:
+              print("FALHA | soccerdata.Sofascore |", repr(e)[:150])
+          try:
+              u = sd.Understat(leagues="ENG-Premier League", seasons="2026-27")
+              print("OK  | soccerdata.Understat | ", len(u.read_schedule()), "jogos")
+          except Exception as e:
+              print("FALHA | soccerdata.Understat |", repr(e)[:150])
+          PY
