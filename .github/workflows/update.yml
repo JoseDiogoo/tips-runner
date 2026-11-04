@@ -26,9 +26,6 @@ on:
         description: "Ignorar os intervalos e pedir já as odds de futebol/NBA (gasta créditos)"
         type: boolean
         default: false
-concurrency:
-  group: dados
-  cancel-in-progress: false
 permissions: {}
 defaults:
   run:
@@ -52,11 +49,16 @@ jobs:
           ONLY_DECIDE: ${{ inputs.only_decide }}
           STALE_ONLY: ${{ inputs.only_if_stale }}
           URL: https://api.github.com/repos/${{ github.repository }}/actions/workflows/update.yml/runs?status=success&per_page=30
+          ALL_URL: https://api.github.com/repos/${{ github.repository }}/actions/workflows/update.yml/runs?per_page=30
+          RUN_ID: ${{ github.run_id }}
         run: |
           skip=false
           decide=false
           if [ "$SCHEDULE" = "5,15,25,35,45,55 * * * *" ] || [ "$ONLY_DECIDE" = "true" ]; then
             decide=true
+            # a atualização completa também decide (execute): se há uma à espera ou a correr, esta decisão não vale a pena e, sobretudo, não a pode substituir na fila
+            busy=$(curl -s -H "Authorization: Bearer ${{ github.token }}" "$ALL_URL" | jq -r --arg me "$RUN_ID" '[.workflow_runs[] | select(.display_title == "atualização" and .status != "completed" and (.id | tostring) != $me)] | length' || echo 0)
+            if [ "${busy:-0}" -gt 0 ]; then skip=true; fi
           elif [ "$EVENT" = "schedule" ] || [ "$STALE_ONLY" = "true" ]; then
             last=$(curl -s -H "Authorization: Bearer ${{ github.token }}" "$URL" | jq -r '[.workflow_runs[] | select(.display_title != "decisão IA")][0].created_at // empty' || true)
             if [ -n "$last" ] && [ $(( $(date +%s) - $(date -d "$last" +%s) )) -lt 720 ]; then skip=true; fi
@@ -67,6 +69,9 @@ jobs:
     needs: check
     if: needs.check.outputs.skip != 'true'
     runs-on: ubuntu-latest
+    concurrency:  # só este job escreve na release: o grupo `dados` está aqui (e não no workflow) para o job `check` correr sempre e uma decisão IA nunca substituir na fila uma atualização à espera
+      group: dados
+      cancel-in-progress: false
     timeout-minutes: 15  # a atualização leva 6 a 9 min; mais do que isto é uma corrida presa e tem de libertar a fila (grupo dados)
     env:
       GH_TOKEN: ${{ secrets.TIPS_TOKEN }}
