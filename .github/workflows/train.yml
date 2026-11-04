@@ -34,7 +34,7 @@ jobs:
       - run: pip install -r requirements.txt > /dev/null 2>&1 || { echo "pip falhou"; exit 1; }
       - run: mkdir -p data && python cloud.py pull > /tmp/run.log 2>&1 || { echo "pull falhou (sem log publico)"; exit 1; }
       - run: python -u -W ignore train.py > data/train_log.txt 2>&1 || { echo "train falhou (sem log publico)"; exit 1; }
-      - run: python cloud.py push >> /tmp/run.log 2>&1 || { echo "push falhou (sem log publico)"; exit 1; }
+      - run: python cloud.py push >> /tmp/run.log 2>&1 || { echo "push falhou: $(grep -a PUSHERR /tmp/run.log | tail -1)"; exit 1; }
       - if: failure()
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
