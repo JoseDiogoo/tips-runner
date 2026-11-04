@@ -1,0 +1,24 @@
+# Vigia: se uma atualização fica presa (o GitHub às vezes demora 20+ min a fechar uma corrida que já acabou), cancela-a para a fila `dados` e as decisões da IA não ficarem bloqueadas.
+name: Vigia das atualizações
+on:
+  schedule:
+    - cron: "3,13,23,33,43,53 * * * *"
+  workflow_dispatch:
+permissions:
+  actions: write
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - run: |
+          now=$(date +%s)
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/update.yml/runs?status=in_progress&per_page=20" --jq '.workflow_runs[] | [.id, .run_started_at] | @tsv' | while read -r id started; do
+            age=$(( now - $(date -d "$started" +%s) ))
+            if [ "$age" -gt 960 ]; then
+              echo "corrida $id presa há $(( age / 60 )) min: a cancelar"
+              gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/cancel" > /dev/null || gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/force-cancel" > /dev/null || true
+            fi
+          done
