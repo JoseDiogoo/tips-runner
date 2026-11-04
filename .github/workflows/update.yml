@@ -100,7 +100,7 @@ jobs:
         run: python -W ignore update.py >> /tmp/run.log 2>&1 || { echo "update falhou (sem log publico)"; exit 1; }
       - if: needs.check.outputs.decide == 'true'
         run: python -W ignore decide.py >> /tmp/run.log 2>&1 || { echo "decide falhou (sem log publico)"; exit 1; }
-      - run: python cloud.py ${{ needs.check.outputs.decide == 'true' && 'push-ia' || 'push' }} >> /tmp/run.log 2>&1 || { echo "push falhou: $(grep -a PUSHERR /tmp/run.log | tail -1)"; exit 1; }
+      - run: python cloud.py ${{ needs.check.outputs.decide == 'true' && 'push-ia' || 'push' }} >> /tmp/run.log 2>&1 || { echo "push falhou - $(grep -a PUSHERR /tmp/run.log | tail -1)"; exit 1; }
       - if: failure()
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
