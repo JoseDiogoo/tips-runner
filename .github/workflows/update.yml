@@ -67,7 +67,7 @@ jobs:
     needs: check
     if: needs.check.outputs.skip != 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15  # a atualização leva 6 a 9 min; mais do que isto é uma corrida presa e tem de libertar a fila (grupo dados)
     env:
       GH_TOKEN: ${{ secrets.TIPS_TOKEN }}
       TIPS_REPO: JoseDiogoo/tips
