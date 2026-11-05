@@ -1,4 +1,4 @@
-# Vigia: se uma atualização fica presa (o GitHub às vezes demora 20+ min a fechar uma corrida que já acabou), cancela-a para a fila `dados` e as decisões da IA não ficarem bloqueadas.
+# Vigia: se uma atualização fica presa (o GitHub às vezes demora 20+ min a fechar uma corrida que já acabou; limite de 22 min: a atualização normal demora 12 a 14 min), cancela-a para a fila `dados` e as decisões da IA não ficarem bloqueadas.
 name: Vigia das atualizações
 on:
   schedule:
@@ -17,7 +17,7 @@ jobs:
           now=$(date +%s)
           gh api "repos/$GITHUB_REPOSITORY/actions/workflows/update.yml/runs?status=in_progress&per_page=20" --jq '.workflow_runs[] | [.id, .run_started_at] | @tsv' | while read -r id started; do
             age=$(( now - $(date -d "$started" +%s) ))
-            if [ "$age" -gt 960 ]; then
+            if [ "$age" -gt 1320 ]; then
               echo "corrida $id presa há $(( age / 60 )) min: a cancelar"
               gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/cancel" > /dev/null || gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/force-cancel" > /dev/null || true
             fi
