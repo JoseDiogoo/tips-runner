@@ -15,7 +15,10 @@ jobs:
     steps:
       - run: |
           now=$(date +%s)
-          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/update.yml/runs?status=in_progress&per_page=20" --jq '.workflow_runs[] | [.id, .run_started_at] | @tsv' | while read -r id started; do
+          # a idade conta desde que o job `update` começou a trabalhar (não desde a criação da corrida: uma atualização que espera 14 min na fila pela anterior era cancelada em saudável)
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/update.yml/runs?status=in_progress&per_page=20" --jq '.workflow_runs[].id' | while read -r id; do
+            started=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs" --jq '[.jobs[] | select(.name=="update" and .status!="queued") | .started_at] | min // empty')
+            [ -z "$started" ] && continue
             age=$(( now - $(date -d "$started" +%s) ))
             if [ "$age" -gt 1320 ]; then
               echo "corrida $id presa há $(( age / 60 )) min: a cancelar"
