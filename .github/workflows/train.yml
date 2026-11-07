@@ -42,3 +42,21 @@ jobs:
         working-directory: .
         run: |
           curl -s -o /dev/null -d chat_id="$TELEGRAM_CHAT_ID" -d text="⚠️ Treinar modelo falhou - ver github.com/JoseDiogoo/tips-runner/actions" "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" || true
+      - if: success()
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+        working-directory: .
+        run: |
+          # voltou ao normal: a corrida anterior que chegou a executar o job `train` (ignora saltadas e canceladas) tinha falhado?
+          api="https://api.github.com/repos/$REPO/actions"
+          prev=""
+          for id in $(curl -s "$api/workflows/train.yml/runs?status=completed&per_page=12" | jq -r --arg me "$RUN_ID" '.workflow_runs[] | select((.id | tostring) != $me) | .id'); do
+            c=$(curl -s "$api/runs/$id/jobs" | jq -r '[.jobs[] | select(.name == "train") | .conclusion][0] // empty')
+            if [ "$c" = "success" ] || [ "$c" = "failure" ]; then prev=$c; break; fi
+          done
+          if [ "$prev" = "failure" ]; then
+            curl -s -o /dev/null -d chat_id="$TELEGRAM_CHAT_ID" -d text="✅ Treinar modelo voltou ao normal" "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" || true
+          fi
