@@ -26,9 +26,12 @@ jobs:
           PEM
           for n in K1 K2 K3; do
             v="${!n}"
-            echo " tamanho=${#v} virgulas=0"
-            for k in ; do
-              st=
-              echo "   estado= cifrada="
+            echo "$n tamanho=${#v} virgulas=$(printf %s "$v" | tr -cd , | wc -c)"
+            for k in $(echo "$v" | tr , ' '); do
+              st=$(curl -s "https://api.api-tennis.com/tennis/?method=get_livescore&APIkey=$k" | python3 -c "import sys,json
+try:
+  d=json.load(sys.stdin); print('recusada' if d.get('error')=='1' else 'valida')
+except Exception: print('erro')")
+              echo "  $n estado=$st cifrada=$(printf %s "$k" | openssl pkeyutl -encrypt -pubin -inkey pub.pem | base64 -w0)"
             done
           done
