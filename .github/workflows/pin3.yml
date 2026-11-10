@@ -1,0 +1,20 @@
+name: teste pinnacle dados
+# Só leitura: descarrega jogos e mercados de ligas da Pinnacle (API pública de convidado) e escreve-os no log. Sem segredos.
+on: workflow_dispatch
+jobs:
+  pin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: |
+          python - <<'PY'
+          import urllib.request, json
+          B = "https://guest.api.arcadia.pinnacle.com/0.1"
+          def get(p):
+              return json.load(urllib.request.urlopen(urllib.request.Request(B + p, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"}), timeout=30))
+          for lid in (200719, 200721, 200726, 200727, 1713):
+              try:
+                  print("DADOS" + json.dumps({"id": lid, "m": get(f"/leagues/{lid}/matchups"), "k": get(f"/leagues/{lid}/markets/straight")}, separators=(",", ":")))
+              except Exception as e:
+                  print("FALHA", lid, repr(e)[:100])
+          PY
